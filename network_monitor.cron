@@ -1,0 +1,1 @@
+*/3 * * * * root /opt/bin/network_monitor > /dev/null 2>&1 ; rc=$? ; echo "$(date) - RC=$rc" >> /var/log/network_monitor.log 2> /dev/null
