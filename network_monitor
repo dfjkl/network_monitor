@@ -37,6 +37,7 @@ if [[ $FAILS -eq 5 ]]; then
   # reset FAILS after rebooting cable modem
   FAILS="reboot"
   echo $FAILS > $FF
+  exit 9
 else
   if ! ping -c 5 $DEFROUTE > /dev/null 2>&1; then
     ## if ping to default gateway fails - reboot the router
