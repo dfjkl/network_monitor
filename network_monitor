@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# script to handle rebooting home network shiz when it busts
+# router reboot command - /opt/bin/router_reboot ROUTER_IP USERNAME PASSWORD
+
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:/opt/bin
+
+DEFROUTE=$(ip route | grep default | cut -d' ' -f3)
+PINGTARGET="8.8.8.8"
+ROUTER_IP=$DEFROUTE
+USERNAME=$username
+PASSWORD=$password
+FF=/tmp/network_monitor.fails
+CR=/tmp/cable_modem.reboots
+RR=/tmp/router.reboots
+FAILS=0
+
+
+if [[ -f $FF ]]; then
+  if grep -q reboot $FF; then
+    FAILS=0
+    echo $FAILS > $FF
+    exit 11
+    ## if we rebooted the cable modem or router in the prior run,
+    ## do nothing this run to allow things to settle down
+  else
+    FAILS=$(cat $FF)
+  fi
+else
+  FAILS=0
+fi
+
+if [[ $FAILS -eq 5 ]]; then
+  # repeated attempts to PINGTARGET have failed, but router is still up
+  # reboot the cable modem now.  HOLD ON TO YOUR BUTTS
+  # logic here to reboot cable modem
+  # reset FAILS after rebooting cable modem
+  FAILS="reboot"
+  echo $FAILS > $FF
+else
+  if ! ping -c 5 $DEFROUTE > /dev/null 2>&1; then
+    ## if ping to default gateway fails - reboot the router
+    router_reboot $ROUTER_IP $USERNAME $PASSWORD
+    FAILS="reboot"
+    echo $FAILS > $FF
+    ## there really should be some logging here
+    exit 1
+  else
+    if ping -c 1 $PINGTARGET > /dev/null 2>&1; then
+      FAILS=0
+      echo $FAILS > $FF
+      exit 0
+    else
+      ## if pings to PINGTARGET fail, increment failure counter and exit
+      FAILS=$((FAILS+1))
+      echo $FAILS > $FF
+      exit 2
+    fi
+  fi             
+fi
+
+
