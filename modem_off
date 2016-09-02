@@ -1,0 +1,30 @@
+#!/usr/bin/expect
+#
+# Set wait timeout
+#
+set timeout 5
+#
+# Make connection, pass ip of mPower to this script
+#
+spawn ssh [lindex $argv 0] -l ubnt
+#
+# wait for the password prompt
+#
+expect "password: "
+#
+# send password string, passed as 2nd parameter to this script.
+# 
+send [lindex $argv 1] 
+send "\r"
+#
+#
+expect "#"
+#
+# turn off relay1
+#
+send "echo 0 > /proc/power/relay1\r"
+#
+# disconnect from mPower...
+#
+expect "#"
+send "exit\r"

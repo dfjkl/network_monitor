@@ -8,13 +8,19 @@ PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:/opt/bin
 DEFROUTE=$(ip route | grep default | cut -d' ' -f3)
 PINGTARGET="8.8.8.8"
 ROUTER_IP=$DEFROUTE
-USERNAME=$username
-PASSWORD=$password
+USERNAME=$un
+PASSWORD=$pw
 FF=/tmp/network_monitor.fails
 CR=/tmp/cable_modem.reboots
 RR=/tmp/router.reboots
 FAILS=0
 
+# set current # of cable modem reboots
+if [[ -f $CR ]]; then
+  CBOOTS=$(cat $CR)
+else
+  CBOOTS=0
+fi
 
 if [[ -f $FF ]]; then
   if grep -q reboot $FF; then
@@ -33,15 +39,41 @@ fi
 if [[ $FAILS -eq 5 ]]; then
   # repeated attempts to PINGTARGET have failed, but router is still up
   # reboot the cable modem now.  HOLD ON TO YOUR BUTTS
-  # logic here to reboot cable modem
+  modem_off $IP $PW
+  sleep 15
+  modem_on $IP $PW
   # reset FAILS after rebooting cable modem
   FAILS="reboot"
   echo $FAILS > $FF
+  CBOOTS=$((CBOOTS+1))
+  echo $CBOOTS > $CR
+  # add some logic to reboot the route if the cable modem 
+  # has been bounced more than once
+  if [[ $CBOOTS -eq 3 ]]; then
+    router_reboot $ROUTER_IP $USERNAME $PASSWORD
+    sleep 60
+    router_reboot $ROUTER_IP $USERNAME $PASSWORD
+    # is Plex still connected to MyPlex - if not, restart
+    sleep 30
+    if ! upnpc -l | grep -q Plex; then
+      service plexmediaserver restart
+    fi
+    CBOOTS=0
+    echo $CBOOTS > $CR
+    exit 99
+  fi
   exit 9
 else
   if ! ping -c 5 $DEFROUTE > /dev/null 2>&1; then
     ## if ping to default gateway fails - reboot the router
     router_reboot $ROUTER_IP $USERNAME $PASSWORD
+    sleep 60
+    router_reboot $ROUTER_IP $USERNAME $PASSWORD
+    # is Plex still connected to MyPlex - if not, restart
+    sleep 45
+    if ! upnpc -l | grep -q Plex; then
+      service plexmediaserver restart
+    fi
     FAILS="reboot"
     echo $FAILS > $FF
     ## there really should be some logging here
@@ -59,5 +91,4 @@ else
     fi
   fi             
 fi
-
 
